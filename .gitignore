@@ -1,0 +1,39 @@
+# === Secrets & runtime ===
+.env
+.env.*
+!.env.example
+data/
+*.session
+*.session-journal
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+dist/
+build/
+pip-wheel-metadata/
+
+# === Tooling caches ===
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# === IDE / editors ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Docker dev artefacts ===
+docker-compose.override.yml
