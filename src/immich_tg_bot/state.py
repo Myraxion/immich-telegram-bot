@@ -43,12 +43,9 @@ class State:
             raise RuntimeError("State.open() was not called")
         return self._db
 
-    async def already_processed(
-        self, chat_id: int, message_id: int, file_index: int = 0
-    ) -> bool:
+    async def already_processed(self, chat_id: int, message_id: int, file_index: int = 0) -> bool:
         cur = await self.db.execute(
-            "SELECT 1 FROM processed_messages "
-            "WHERE chat_id=? AND message_id=? AND file_index=?",
+            "SELECT 1 FROM processed_messages WHERE chat_id=? AND message_id=? AND file_index=?",
             (chat_id, message_id, file_index),
         )
         return await cur.fetchone() is not None
@@ -69,9 +66,7 @@ class State:
         await self.db.commit()
 
     async def asset_for_sha1(self, sha1: str) -> str | None:
-        cur = await self.db.execute(
-            "SELECT asset_id FROM sha1_cache WHERE sha1=?", (sha1,)
-        )
+        cur = await self.db.execute("SELECT asset_id FROM sha1_cache WHERE sha1=?", (sha1,))
         row = await cur.fetchone()
         return row[0] if row else None
 

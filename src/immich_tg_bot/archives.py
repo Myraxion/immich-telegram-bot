@@ -22,13 +22,39 @@ _JUNK_PARTS = ("__MACOSX",)
 
 MEDIA_EXTENSIONS = {
     # photos
-    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp",
-    ".tif", ".tiff", ".avif",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".heic",
+    ".heif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".avif",
     # raw
-    ".dng", ".raw", ".cr2", ".cr3", ".nef", ".arw", ".rw2", ".orf", ".raf",
+    ".dng",
+    ".raw",
+    ".cr2",
+    ".cr3",
+    ".nef",
+    ".arw",
+    ".rw2",
+    ".orf",
+    ".raf",
     # video
-    ".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm", ".3gp", ".mpg", ".mpeg",
-    ".wmv", ".flv",
+    ".mp4",
+    ".mov",
+    ".m4v",
+    ".avi",
+    ".mkv",
+    ".webm",
+    ".3gp",
+    ".mpg",
+    ".mpeg",
+    ".wmv",
+    ".flv",
 }
 
 
@@ -48,16 +74,17 @@ async def extract(archive: Path, dest: Path) -> None:
     proc = await asyncio.create_subprocess_exec(
         "bsdtar",
         "-x",
-        "-f", str(archive),
-        "-C", str(dest),
+        "-f",
+        str(archive),
+        "-C",
+        str(dest),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     _, stderr = await proc.communicate()
     if proc.returncode != 0:
         raise RuntimeError(
-            f"bsdtar exited {proc.returncode}: "
-            f"{stderr.decode('utf-8', errors='replace').strip()}"
+            f"bsdtar exited {proc.returncode}: {stderr.decode('utf-8', errors='replace').strip()}"
         )
 
 

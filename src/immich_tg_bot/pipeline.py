@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from PIL import Image
@@ -32,9 +32,7 @@ def _exif_datetime(path: Path) -> datetime | None:
         if not raw:
             continue
         try:
-            return datetime.strptime(str(raw), "%Y:%m:%d %H:%M:%S").replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.strptime(str(raw), "%Y:%m:%d %H:%M:%S").replace(tzinfo=UTC)
         except ValueError:
             continue
     return None
@@ -58,7 +56,7 @@ async def upload_one(
         return "cached", cached
 
     created_at = _exif_datetime(file_path) or fallback_created_at
-    modified_at = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+    modified_at = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
 
     result = await immich.upload_asset(
         file_path=file_path,

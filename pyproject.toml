@@ -51,6 +51,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "ASYNC"]
+# ASYNC240: We make occasional pathlib calls inside async handlers
+# (mkdir, exists, stat). For a single-user Telegram bot they run on local
+# filesystem in microseconds and don't warrant the noise of asyncio.to_thread
+# wrappers. Revisit if/when we add high-concurrency workloads.
+ignore = ["ASYNC240"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

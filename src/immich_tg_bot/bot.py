@@ -1,9 +1,10 @@
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from aiogram import BaseMiddleware, Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -69,9 +70,7 @@ def _is_archive_message(message: Message) -> bool:
     return False
 
 
-async def _resolve_local_path(
-    bot: Bot, file_id: str, tg_files_dir: Path
-) -> Path:
+async def _resolve_local_path(bot: Bot, file_id: str, tg_files_dir: Path) -> Path:
     """In local Bot API mode, file.file_path is an absolute server-side filesystem
     path. The volume is mounted into our container at the same path, so we read
     it directly."""
@@ -141,11 +140,7 @@ async def run_bot(settings: Settings) -> None:
 
         archive_flag = _is_archive_message(message)
         device_asset_prefix = f"telegram:{message.chat.id}:{message.message_id}"
-        fallback_dt = (
-            message.date.astimezone(timezone.utc)
-            if message.date
-            else datetime.now(timezone.utc)
-        )
+        fallback_dt = message.date.astimezone(UTC) if message.date else datetime.now(UTC)
 
         results = await process_file(
             local_path=local,
@@ -156,9 +151,7 @@ async def run_bot(settings: Settings) -> None:
             state=state,
             max_archive_files=settings.max_archive_files,
         )
-        await state.mark_processed(
-            message.chat.id, message.message_id, 0, "done", None
-        )
+        await state.mark_processed(message.chat.id, message.message_id, 0, "done", None)
 
         uploaded = duplicates = errors = 0
         new_ids: list[str] = []
@@ -192,9 +185,7 @@ async def run_bot(settings: Settings) -> None:
         if errors and not uploaded and not duplicates:
             await head.reply(f"⚠️ Ошибок: {errors}")
         elif errors:
-            await head.reply(
-                f"⚠️ Загружено: {uploaded}, дубликатов: {duplicates}, ошибок: {errors}"
-            )
+            await head.reply(f"⚠️ Загружено: {uploaded}, дубликатов: {duplicates}, ошибок: {errors}")
         elif duplicates and not uploaded:
             await head.reply(f"♻️ Уже в Immich (дубликатов: {duplicates})")
         elif duplicates:
@@ -236,15 +227,7 @@ async def run_bot(settings: Settings) -> None:
             "Дубликаты определяются по SHA1 — повторная отправка безопасна."
         )
 
-    media_filter = (
-        F.photo
-        | F.video
-        | F.document
-        | F.animation
-        | F.audio
-        | F.voice
-        | F.video_note
-    )
+    media_filter = F.photo | F.video | F.document | F.animation | F.audio | F.voice | F.video_note
 
     @dp.message(media_filter)
     async def on_media(message: Message) -> None:
