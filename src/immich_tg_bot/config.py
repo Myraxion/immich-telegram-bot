@@ -1,7 +1,9 @@
+import json
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -17,7 +19,7 @@ class Settings(BaseSettings):
     telegram_api_hash: str
     immich_url: str
     immich_api_key: str
-    allowed_user_ids: list[int] | str = Field(default_factory=list)
+    allowed_user_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
 
     album_name: str | None = None
     max_archive_mb: int = 2000
@@ -28,14 +30,19 @@ class Settings(BaseSettings):
     tg_files_dir: Path = Path("/var/lib/telegram-bot-api")
     tg_api_base: str = "http://telegram-bot-api:8081"
 
-    @field_validator("allowed_user_ids")
+    @field_validator("allowed_user_ids", mode="before")
     @classmethod
-    def _split_user_ids(cls, v: object) -> list[int]:
+    def _parse_user_ids(cls, v: object) -> list[int]:
         if isinstance(v, str):
-            return [int(x.strip()) for x in v.split(",") if x.strip()]
-        if isinstance(v, list):
-            return [int(x) for x in v]
-        return []
+            try:
+                decoded = json.loads(v)
+            except json.JSONDecodeError:
+                v = v.split(",")
+            else:
+                v = decoded if isinstance(decoded, list) else [decoded]
+        if not isinstance(v, list):
+            raise ValueError("allowed_user_ids must be a comma-separated list or JSON array")
+        return [int(x) for x in v if str(x).strip()]
 
     @field_validator("immich_url")
     @classmethod

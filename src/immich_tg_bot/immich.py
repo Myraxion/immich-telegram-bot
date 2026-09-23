@@ -34,6 +34,8 @@ class ImmichClient:
             r = await self._client.get("/server/ping")
             if r.status_code == 200:
                 return True
+            if r.status_code != 404:
+                return False
             r = await self._client.get("/server-info/ping")
             return r.status_code == 200
         except httpx.HTTPError as e:
