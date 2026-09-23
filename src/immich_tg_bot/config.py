@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     telegram_api_hash: str
     immich_url: str
     immich_api_key: str
-    allowed_user_ids: list[int] = Field(default_factory=list)
+    allowed_user_ids: list[int] | str = Field(default_factory=list)
 
     album_name: str | None = None
     max_archive_mb: int = 2000
@@ -28,12 +28,14 @@ class Settings(BaseSettings):
     tg_files_dir: Path = Path("/var/lib/telegram-bot-api")
     tg_api_base: str = "http://telegram-bot-api:8081"
 
-    @field_validator("allowed_user_ids", mode="before")
+    @field_validator("allowed_user_ids")
     @classmethod
-    def _split_user_ids(cls, v: object) -> object:
+    def _split_user_ids(cls, v: object) -> list[int]:
         if isinstance(v, str):
             return [int(x.strip()) for x in v.split(",") if x.strip()]
-        return v
+        if isinstance(v, list):
+            return [int(x) for x in v]
+        return []
 
     @field_validator("immich_url")
     @classmethod

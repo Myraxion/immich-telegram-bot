@@ -31,6 +31,9 @@ class ImmichClient:
 
     async def ping(self) -> bool:
         try:
+            r = await self._client.get("/server/ping")
+            if r.status_code == 200:
+                return True
             r = await self._client.get("/server-info/ping")
             return r.status_code == 200
         except httpx.HTTPError as e:
