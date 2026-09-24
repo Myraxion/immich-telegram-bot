@@ -83,3 +83,48 @@ async def test_extract_ingest_item_returns_none_for_text_message(tmp_path: Path)
     )
     item = await _extract_ingest_item(bot, cast(Any, msg), tmp_path)
     assert item is None
+
+
+@pytest.mark.asyncio
+async def test_extract_ingest_item_from_photo_uses_dynamic_naming(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from immich_tg_bot.bot import _extract_ingest_item
+    from immich_tg_bot.config import Settings
+
+    token = "test_bot"
+    photo_path = tmp_path / token / "photos" / "file_0.jpg"
+    photo_path.parent.mkdir(parents=True)
+    photo_path.touch()
+
+    bot = cast(Bot, FakeBot(token, "photos/file_0.jpg"))
+    msg = SimpleNamespace(
+        chat=SimpleNamespace(id=12345, title="MyChat", full_name="MyChat"),
+        message_id=999,
+        date=datetime(2026, 9, 24, 12, 0, tzinfo=UTC),
+        from_user=SimpleNamespace(id=1, full_name="User", username="user"),
+        caption=None,
+        media_group_id=None,
+        forward_origin=None,
+        photo=[SimpleNamespace(file_id="photo-1", file_unique_id="uniq-1")],
+        document=None,
+        video=None,
+        animation=None,
+        audio=None,
+        voice=None,
+        video_note=None,
+    )
+
+    settings = Settings.model_construct(
+        tz="UTC",
+        media_name_template="{source}_{message_id}_{index}",
+        document_name_template="{original_name}",
+        album_name_template="{source}",
+        album_name="DefaultAlbum",
+    )
+
+    item = await _extract_ingest_item(bot, cast(Any, msg), tmp_path, settings=settings, index=1)
+    assert item is not None
+    assert item.file_name == "MyChat_999_1.jpg"
+    assert item.target_album == "MyChat"
+

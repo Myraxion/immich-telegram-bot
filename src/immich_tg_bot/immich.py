@@ -20,6 +20,7 @@ def sha1_file(path: Path, chunk: int = 65536) -> str:
 class ImmichClient:
     def __init__(self, base_url: str, api_key: str) -> None:
         self.base_url = base_url
+        self._album_cache: dict[str, str] = {}
         self._client = httpx.AsyncClient(
             base_url=base_url,
             headers={"x-api-key": api_key, "Accept": "application/json"},
@@ -51,12 +52,14 @@ class ImmichClient:
         file_created_at: datetime,
         file_modified_at: datetime,
         checksum: str | None = None,
+        file_name: str | None = None,
     ) -> dict[str, Any]:
         headers: dict[str, str] = {}
         if checksum:
             headers["x-immich-checksum"] = checksum
+        upload_name = file_name or file_path.name
         with file_path.open("rb") as f:
-            files = {"assetData": (file_path.name, f, "application/octet-stream")}
+            files = {"assetData": (upload_name, f, "application/octet-stream")}
             data = {
                 "deviceAssetId": device_asset_id,
                 "deviceId": device_id,
@@ -68,14 +71,21 @@ class ImmichClient:
         return r.json()
 
     async def get_or_create_album(self, name: str) -> str:
+        if name in self._album_cache:
+            return self._album_cache[name]
         r = await self._client.get("/albums")
         r.raise_for_status()
         for album in r.json():
+            if album.get("albumName"):
+                self._album_cache[album["albumName"]] = album["id"]
             if album.get("albumName") == name:
                 return album["id"]
         r = await self._client.post("/albums", json={"albumName": name})
         r.raise_for_status()
-        return r.json()["id"]
+        album_id = r.json()["id"]
+        self._album_cache[name] = album_id
+        return album_id
+
 
     async def add_to_album(self, album_id: str, asset_ids: list[str]) -> None:
         if not asset_ids:

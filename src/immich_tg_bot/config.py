@@ -22,9 +22,15 @@ class Settings(BaseSettings):
     allowed_user_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
 
     album_name: str | None = None
+    album_name_template: str = ""
+    media_name_template: str = "{source}_{message_id}_{index}"
+    document_name_template: str = "{original_name}"
+    tz: str = "UTC"
+
     max_archive_mb: int = 2000
     max_archive_files: int = 1000
     log_level: str = "INFO"
+
 
     data_dir: Path = Path("/data")
     tg_files_dir: Path = Path("/var/lib/telegram-bot-api")
@@ -48,3 +54,15 @@ class Settings(BaseSettings):
     @classmethod
     def _strip_trailing_slash(cls, v: str) -> str:
         return v.rstrip("/")
+
+    @field_validator("tz")
+    @classmethod
+    def _validate_tz(cls, v: str) -> str:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as e:
+            raise ValueError(f"Invalid timezone: {v}") from e
+        return v
+

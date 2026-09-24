@@ -314,3 +314,79 @@ async def test_ingest_archive_partial_failure_allows_safe_retry(
     assert summary2.errors == 0
     # 全部无错后，消息成功标记完成
     assert await state.already_processed(1001, 2001) is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_passes_custom_file_name_to_upload_asset(
+    tmp_path: Path, state: State, fake_immich: AsyncMock
+) -> None:
+    img_path = tmp_path / "raw_temp_name.jpg"
+    img_path.write_bytes(b"dummy image data")
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img_path,
+        file_name="custom_rendered_name.jpg",
+        created_at=datetime.now(UTC),
+    )
+
+    await pipeline.ingest([item])
+
+    fake_immich.upload_asset.assert_awaited_once()
+    kwargs = fake_immich.upload_asset.call_args.kwargs
+    assert kwargs.get("file_name") == "custom_rendered_name.jpg"
+
+
+@pytest.mark.asyncio
+async def test_ingest_dynamic_album_routing_groups_assets(
+    tmp_path: Path, state: State, fake_immich: AsyncMock
+) -> None:
+    img1 = tmp_path / "img1.jpg"
+    img1.write_bytes(b"data 1")
+    img2 = tmp_path / "img2.jpg"
+    img2.write_bytes(b"data 2")
+    img3 = tmp_path / "img3.jpg"
+    img3.write_bytes(b"data 3")
+
+    fake_immich.upload_asset.side_effect = [
+        {"id": "asset-1", "status": "created"},
+        {"id": "asset-2", "status": "created"},
+        {"id": "asset-3", "status": "created"},
+    ]
+    fake_immich.get_or_create_album.side_effect = lambda name: f"id-{name}"
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state)
+    item1 = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img1,
+        file_name="img1.jpg",
+        created_at=datetime.now(UTC),
+        target_album="Channel_A",
+    )
+    item2 = IngestItem(
+        chat_id=1001,
+        message_id=2002,
+        local_path=img2,
+        file_name="img2.jpg",
+        created_at=datetime.now(UTC),
+        target_album="Channel_B",
+    )
+    item3 = IngestItem(
+        chat_id=1001,
+        message_id=2003,
+        local_path=img3,
+        file_name="img3.jpg",
+        created_at=datetime.now(UTC),
+        target_album="Channel_A",
+    )
+
+    summary = await pipeline.ingest([item1, item2, item3])
+    assert summary.uploaded == 3
+
+    # Channel_A should have asset-1 and asset-3; Channel_B should have asset-2
+    fake_immich.add_to_album.assert_any_await("id-Channel_A", ["asset-1", "asset-3"])
+    fake_immich.add_to_album.assert_any_await("id-Channel_B", ["asset-2"])
+

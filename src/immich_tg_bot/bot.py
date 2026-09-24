@@ -16,7 +16,8 @@ from aiogram.types import Message, TelegramObject
 
 from .config import Settings
 from .immich import ImmichClient
-from .pipeline import IngestionPipeline, IngestItem
+from .naming import disambiguate_filenames, extract_metadata, resolve_album_name, resolve_filename
+from .pipeline import IngestionPipeline, IngestItem, _exif_datetime
 from .state import State
 
 log = logging.getLogger(__name__)
@@ -47,22 +48,58 @@ class WhitelistMiddleware(BaseMiddleware):
         return await handler(event, data)
 
 
-def _file_id_for(message: Message) -> str | None:
+def _media_info_for(message: Message) -> tuple[str | None, str, str, str]:
     if message.document:
-        return message.document.file_id
+        return (
+            message.document.file_id,
+            getattr(message.document, "file_unique_id", "") or "",
+            "document",
+            message.document.file_name or "",
+        )
     if message.video:
-        return message.video.file_id
+        return (
+            message.video.file_id,
+            getattr(message.video, "file_unique_id", "") or "",
+            "video",
+            getattr(message.video, "file_name", "") or "",
+        )
     if message.animation:
-        return message.animation.file_id
+        return (
+            message.animation.file_id,
+            getattr(message.animation, "file_unique_id", "") or "",
+            "animation",
+            getattr(message.animation, "file_name", "") or "",
+        )
     if message.audio:
-        return message.audio.file_id
+        return (
+            message.audio.file_id,
+            getattr(message.audio, "file_unique_id", "") or "",
+            "audio",
+            getattr(message.audio, "file_name", "") or "",
+        )
     if message.voice:
-        return message.voice.file_id
+        return (
+            message.voice.file_id,
+            getattr(message.voice, "file_unique_id", "") or "",
+            "voice",
+            "",
+        )
     if message.video_note:
-        return message.video_note.file_id
+        return (
+            message.video_note.file_id,
+            getattr(message.video_note, "file_unique_id", "") or "",
+            "video_note",
+            "",
+        )
     if message.photo:
-        return message.photo[-1].file_id
-    return None
+        best = message.photo[-1]
+        return (
+            best.file_id,
+            getattr(best, "file_unique_id", "") or "",
+            "photo",
+            "",
+        )
+    return None, "", "", ""
 
 
 async def _resolve_local_path(bot: Bot, file_id: str, tg_files_dir: Path) -> Path:
@@ -80,19 +117,63 @@ async def _resolve_local_path(bot: Bot, file_id: str, tg_files_dir: Path) -> Pat
     raise FileNotFoundError(f"Cannot locate downloaded file: {tg_file.file_path}")
 
 
-async def _extract_ingest_item(bot: Bot, message: Message, tg_files_dir: Path) -> IngestItem | None:
-    file_id = _file_id_for(message)
+async def _extract_ingest_item(
+    bot: Bot,
+    message: Message,
+    tg_files_dir: Path,
+    settings: Settings | None = None,
+    index: int = 1,
+) -> IngestItem | None:
+    file_id, file_unique_id, media_type, original_name = _media_info_for(message)
     if not file_id:
         return None
     local = await _resolve_local_path(bot, file_id, tg_files_dir)
-    file_name = (message.document and message.document.file_name) or local.name
     fallback_dt = message.date.astimezone(UTC) if message.date else datetime.now(UTC)
+
+    if settings is None:
+        file_name = original_name or local.name
+        target_album = None
+    else:
+        from zoneinfo import ZoneInfo
+
+        target_tz = ZoneInfo(settings.tz)
+        ext = (
+            Path(original_name).suffix
+            if (media_type == "document" and original_name)
+            else local.suffix
+        )
+        exif_dt = _exif_datetime(local)
+        meta = extract_metadata(
+            message,
+            target_tz=target_tz,
+            index=index,
+            file_unique_id=file_unique_id,
+            media_type=media_type,
+            original_name=original_name,
+            exif_date=exif_dt,
+        )
+
+        if media_type == "document":
+            tmpl = settings.document_name_template
+            default_tmpl = "{original_name}"
+        else:
+            tmpl = settings.media_name_template
+            default_tmpl = "{source}_{message_id}_{index}"
+
+        file_name = resolve_filename(tmpl, meta, extension=ext, default_template=default_tmpl)
+        target_album = resolve_album_name(
+            settings.album_name_template,
+            meta,
+            fallback_album=settings.album_name,
+        )
+
     return IngestItem(
         chat_id=message.chat.id,
         message_id=message.message_id,
         local_path=local,
         file_name=file_name,
         created_at=fallback_dt,
+        target_album=target_album,
     )
 
 
@@ -127,6 +208,7 @@ async def run_bot(settings: Settings) -> None:
         immich=immich,
         state=state,
         album_id=album_id,
+        default_album_name=settings.album_name,
         max_archive_files=settings.max_archive_files,
     )
 
@@ -138,18 +220,37 @@ async def run_bot(settings: Settings) -> None:
     group_lock = asyncio.Lock()
 
     async def _process_messages(messages: list[Message]) -> None:
-        items: list[IngestItem] = []
+        raw_items: list[tuple[IngestItem, str]] = []
         resolve_errors = 0
-        for m in messages:
+        for idx, m in enumerate(messages, start=1):
             try:
-                item = await _extract_ingest_item(bot, m, settings.tg_files_dir)
+                item = await _extract_ingest_item(
+                    bot, m, settings.tg_files_dir, settings=settings, index=idx
+                )
                 if item:
-                    items.append(item)
+                    raw_items.append((item, item.file_name))
             except Exception as e:
                 log.exception("Could not get file for message %s", m.message_id)
                 with suppress(Exception):
                     await m.reply(f"⚠️ Не удалось получить файл: {e}")
                 resolve_errors += 1
+
+        filenames = [fn for _, fn in raw_items]
+        disambiguated = disambiguate_filenames(filenames)
+
+        items = [
+            IngestItem(
+                chat_id=it.chat_id,
+                message_id=it.message_id,
+                local_path=it.local_path,
+                file_name=final_fn,
+                created_at=it.created_at,
+                target_album=it.target_album,
+            )
+            for (it, _), final_fn in zip(raw_items, disambiguated, strict=False)
+        ]
+
+
 
         summary = await pipeline.ingest(items)
         uploaded = summary.uploaded

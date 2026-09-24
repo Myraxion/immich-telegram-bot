@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import tempfile
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -28,6 +29,7 @@ class IngestItem:
     local_path: Path
     file_name: str
     created_at: datetime
+    target_album: str | None = None
 
 
 @dataclass
@@ -64,12 +66,14 @@ class IngestionPipeline:
         immich: ImmichClient,
         state: State,
         album_id: str | None = None,
+        default_album_name: str | None = None,
         max_archive_files: int = 1000,
         device_id: str = DEVICE_ID,
     ) -> None:
         self._immich = immich
         self._state = state
         self._album_id = album_id
+        self._default_album_name = default_album_name
         self._max_archive_files = max_archive_files
         self._device_id = device_id
 
@@ -78,23 +82,35 @@ class IngestionPipeline:
         if not items:
             return summary
 
+        album_groups: dict[str, list[str]] = defaultdict(list)
         for item in items:
-            await self._ingest_item(item, summary)
+            await self._ingest_item(item, summary, album_groups)
 
-        if self._album_id and summary.new_asset_ids:
+        for album_key, asset_ids in album_groups.items():
+            if not asset_ids:
+                continue
             try:
-                await self._immich.add_to_album(self._album_id, summary.new_asset_ids)
+                if self._album_id and album_key == self._album_id:
+                    target_id = self._album_id
+                else:
+                    target_id = await self._immich.get_or_create_album(album_key)
+                await self._immich.add_to_album(target_id, asset_ids)
             except Exception as e:
                 log.warning(
-                    "Failed to add %d asset(s) to album %s: %s",
-                    len(summary.new_asset_ids),
-                    self._album_id,
+                    "Failed to add %d asset(s) to album %r: %s",
+                    len(asset_ids),
+                    album_key,
                     e,
                 )
 
         return summary
 
-    async def _ingest_item(self, item: IngestItem, summary: IngestSummary) -> None:
+    async def _ingest_item(
+        self,
+        item: IngestItem,
+        summary: IngestSummary,
+        album_groups: dict[str, list[str]],
+    ) -> None:
         # 1. 消息级去重
         if await self._state.already_processed(item.chat_id, item.message_id):
             summary.duplicates += 1
@@ -128,20 +144,26 @@ class IngestionPipeline:
                 for i, m in enumerate(media):
                     await self._dispatch_upload(
                         file_path=m,
+                        file_name=m.name,
+                        target_album=item.target_album,
                         device_asset_id=f"{prefix}:{i}:{m.name}",
                         created_at=item.created_at,
                         summary=summary,
                         item_new_ids=item_new_ids,
                         item_errors=item_errors,
+                        album_groups=album_groups,
                     )
         else:
             await self._dispatch_upload(
                 file_path=item.local_path,
+                file_name=item.file_name,
+                target_album=item.target_album,
                 device_asset_id=prefix,
                 created_at=item.created_at,
                 summary=summary,
                 item_new_ids=item_new_ids,
                 item_errors=item_errors,
+                album_groups=album_groups,
             )
 
         # 3. 严格成功标记：若无错误，标记消息已完成
@@ -152,15 +174,19 @@ class IngestionPipeline:
         self,
         *,
         file_path: Path,
+        file_name: str,
+        target_album: str | None,
         device_asset_id: str,
         created_at: datetime,
         summary: IngestSummary,
         item_new_ids: list[str],
         item_errors: list[str],
+        album_groups: dict[str, list[str]],
     ) -> None:
         try:
             status, asset_id = await self._upload_one(
                 file_path=file_path,
+                file_name=file_name,
                 device_asset_id=device_asset_id,
                 fallback_created_at=created_at,
             )
@@ -168,6 +194,9 @@ class IngestionPipeline:
                 summary.uploaded += 1
                 summary.new_asset_ids.append(asset_id)
                 item_new_ids.append(asset_id)
+                effective_album = target_album or self._default_album_name or self._album_id
+                if effective_album:
+                    album_groups[effective_album].append(asset_id)
             elif status in ("duplicate", "cached"):
                 summary.duplicates += 1
         except Exception as e:
@@ -181,6 +210,7 @@ class IngestionPipeline:
         self,
         *,
         file_path: Path,
+        file_name: str,
         device_asset_id: str,
         fallback_created_at: datetime,
     ) -> tuple[str, str]:
@@ -194,6 +224,7 @@ class IngestionPipeline:
 
         result = await self._immich.upload_asset(
             file_path=file_path,
+            file_name=file_name,
             device_asset_id=device_asset_id,
             device_id=self._device_id,
             file_created_at=created_at,
@@ -204,3 +235,4 @@ class IngestionPipeline:
         status = result.get("status", "created")
         await self._state.cache_sha1(checksum, asset_id)
         return status, asset_id
+
