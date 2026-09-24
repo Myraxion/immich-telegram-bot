@@ -12,12 +12,11 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, TelegramObject
 
-from .archives import is_archive
 from .config import Settings
 from .immich import ImmichClient
-from .pipeline import process_file
+from .pipeline import IngestionPipeline, IngestItem
 from .state import State
 
 log = logging.getLogger(__name__)
@@ -31,10 +30,12 @@ class WhitelistMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        if not isinstance(event, Message):
+            return await handler(event, data)
         user = event.from_user
         if user is None or user.id not in self.allowed:
             log.info(
@@ -64,12 +65,6 @@ def _file_id_for(message: Message) -> str | None:
     return None
 
 
-def _is_archive_message(message: Message) -> bool:
-    if message.document and message.document.file_name:
-        return is_archive(message.document.file_name)
-    return False
-
-
 async def _resolve_local_path(bot: Bot, file_id: str, tg_files_dir: Path) -> Path:
     """Locate a file exposed by the local Bot API through the shared volume."""
     tg_file = await bot.get_file(file_id)
@@ -83,6 +78,22 @@ async def _resolve_local_path(bot: Bot, file_id: str, tg_files_dir: Path) -> Pat
     if candidate.exists():
         return candidate
     raise FileNotFoundError(f"Cannot locate downloaded file: {tg_file.file_path}")
+
+
+async def _extract_ingest_item(bot: Bot, message: Message, tg_files_dir: Path) -> IngestItem | None:
+    file_id = _file_id_for(message)
+    if not file_id:
+        return None
+    local = await _resolve_local_path(bot, file_id, tg_files_dir)
+    file_name = (message.document and message.document.file_name) or local.name
+    fallback_dt = message.date.astimezone(UTC) if message.date else datetime.now(UTC)
+    return IngestItem(
+        chat_id=message.chat.id,
+        message_id=message.message_id,
+        local_path=local,
+        file_name=file_name,
+        created_at=fallback_dt,
+    )
 
 
 async def run_bot(settings: Settings) -> None:
@@ -112,6 +123,13 @@ async def run_bot(settings: Settings) -> None:
                 e,
             )
 
+    pipeline = IngestionPipeline(
+        immich=immich,
+        state=state,
+        album_id=album_id,
+        max_archive_files=settings.max_archive_files,
+    )
+
     dp = Dispatcher()
     dp.message.middleware(WhitelistMiddleware(set(settings.allowed_user_ids)))
 
@@ -119,65 +137,24 @@ async def run_bot(settings: Settings) -> None:
     group_tasks: dict[str, asyncio.Task[None]] = {}
     group_lock = asyncio.Lock()
 
-    async def _process_one(message: Message) -> tuple[int, int, int, list[str]]:
-        """Returns (uploaded, duplicates, errors, new_asset_ids)."""
-        file_id = _file_id_for(message)
-        if not file_id:
-            return 0, 0, 0, []
-
-        if await state.already_processed(message.chat.id, message.message_id):
-            return 0, 1, 0, []
-
-        try:
-            local = await _resolve_local_path(bot, file_id, settings.tg_files_dir)
-        except Exception as e:
-            log.exception("Could not get file for message %s", message.message_id)
-            with suppress(Exception):
-                await message.reply(f"⚠️ Не удалось получить файл: {e}")
-            return 0, 0, 1, []
-
-        archive_flag = _is_archive_message(message)
-        device_asset_prefix = f"telegram:{message.chat.id}:{message.message_id}"
-        fallback_dt = message.date.astimezone(UTC) if message.date else datetime.now(UTC)
-
-        results = await process_file(
-            local_path=local,
-            is_archive_flag=archive_flag,
-            device_asset_prefix=device_asset_prefix,
-            fallback_created_at=fallback_dt,
-            immich=immich,
-            state=state,
-            max_archive_files=settings.max_archive_files,
-        )
-        await state.mark_processed(message.chat.id, message.message_id, 0, "done", None)
-
-        uploaded = duplicates = errors = 0
-        new_ids: list[str] = []
-        for status, asset_id in results:
-            if status == "created":
-                uploaded += 1
-                new_ids.append(asset_id)
-            elif status in ("duplicate", "cached"):
-                duplicates += 1
-            else:
-                errors += 1
-        return uploaded, duplicates, errors, new_ids
-
     async def _process_messages(messages: list[Message]) -> None:
-        uploaded = duplicates = errors = 0
-        new_ids: list[str] = []
+        items: list[IngestItem] = []
+        resolve_errors = 0
         for m in messages:
-            u, d, e, ids = await _process_one(m)
-            uploaded += u
-            duplicates += d
-            errors += e
-            new_ids.extend(ids)
-
-        if album_id and new_ids:
             try:
-                await immich.add_to_album(album_id, new_ids)
+                item = await _extract_ingest_item(bot, m, settings.tg_files_dir)
+                if item:
+                    items.append(item)
             except Exception as e:
-                log.warning("Failed to add %d asset(s) to album: %s", len(new_ids), e)
+                log.exception("Could not get file for message %s", m.message_id)
+                with suppress(Exception):
+                    await m.reply(f"⚠️ Не удалось получить файл: {e}")
+                resolve_errors += 1
+
+        summary = await pipeline.ingest(items)
+        uploaded = summary.uploaded
+        duplicates = summary.duplicates
+        errors = summary.errors + resolve_errors
 
         head = messages[0]
         if errors and not uploaded and not duplicates:

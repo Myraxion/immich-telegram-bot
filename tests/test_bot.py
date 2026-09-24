@@ -1,6 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from aiogram import Bot
@@ -19,7 +19,7 @@ class FakeBot:
 
 @pytest.mark.asyncio
 async def test_resolve_local_path_uses_per_bot_directory(tmp_path: Path) -> None:
-    token = "123:token"
+    token = "123_token"
     expected = tmp_path / token / "photos" / "file_1.jpg"
     expected.parent.mkdir(parents=True)
     expected.touch()
@@ -28,3 +28,58 @@ async def test_resolve_local_path_uses_per_bot_directory(tmp_path: Path) -> None
     actual = await _resolve_local_path(bot, "file-id", tmp_path)
 
     assert actual == expected
+
+
+@pytest.mark.asyncio
+async def test_extract_ingest_item_from_document(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from immich_tg_bot.bot import _extract_ingest_item
+
+    token = "test_bot"
+    doc_path = tmp_path / token / "docs" / "vacation.zip"
+    doc_path.parent.mkdir(parents=True)
+    doc_path.touch()
+
+    bot = cast(Bot, FakeBot(token, "docs/vacation.zip"))
+    msg = SimpleNamespace(
+        chat=SimpleNamespace(id=12345),
+        message_id=67890,
+        date=datetime(2026, 9, 24, 12, 0, tzinfo=UTC),
+        document=SimpleNamespace(file_id="file-doc-1", file_name="vacation.zip"),
+        video=None,
+        animation=None,
+        audio=None,
+        voice=None,
+        video_note=None,
+        photo=None,
+    )
+
+    item = await _extract_ingest_item(bot, cast(Any, msg), tmp_path)
+    assert item is not None
+    assert item.chat_id == 12345
+    assert item.message_id == 67890
+    assert item.file_name == "vacation.zip"
+    assert item.local_path == doc_path
+    assert item.created_at == datetime(2026, 9, 24, 12, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_extract_ingest_item_returns_none_for_text_message(tmp_path: Path) -> None:
+    from immich_tg_bot.bot import _extract_ingest_item
+
+    bot = cast(Bot, FakeBot("test_bot", None))
+    msg = SimpleNamespace(
+        chat=SimpleNamespace(id=12345),
+        message_id=67890,
+        date=None,
+        document=None,
+        video=None,
+        animation=None,
+        audio=None,
+        voice=None,
+        video_note=None,
+        photo=None,
+    )
+    item = await _extract_ingest_item(bot, cast(Any, msg), tmp_path)
+    assert item is None
