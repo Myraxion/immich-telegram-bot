@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-09-24
+
+### Added
+- **Dynamic File Naming**: Configurable file naming rules via `MEDIA_NAME_TEMPLATE` (default: `{source}_{message_id}_{index}`) for photos/videos and `DOCUMENT_NAME_TEMPLATE` (default: `{original_name}`) for documents.
+- **Dynamic Album Routing**: Configurable target album resolution via `ALBUM_NAME_TEMPLATE`, automatically routing media into dynamically named Immich albums with fallback to `ALBUM_NAME`.
+- **Rich Metadata Variables**:
+  - Smart fallback variables: `{source}`, `{source_id}`, `{source_username}` / `{username}`, `{message_id}`, `{date}`.
+  - Explicit variables: `{msg_date}`, `{forward_date}`, `{exif_date}`, `{sender}`, `{media_type}`, `{file_unique_id}`, `{media_group_id}`, `{caption}`, `{index}`, etc.
+- **Timezone Awareness (`TZ`)**: Integrated `TZ` environment configuration (default `UTC`, e.g. `Asia/Shanghai`) converting all date/timestamp metadata to local timezone.
+- **Fault-Tolerant Formatting**: Three-level error fallback ensuring unknown variables and malformed templates safely degrade to defaults without interrupting ingestion.
+- **Batch Collision Disambiguation**: Deterministic collision avoidance algorithm preventing duplicate filenames in media groups or batch transfers.
+- **Immich Album Caching**: Added in-memory album cache in `ImmichClient` to reduce redundant album lookup and creation requests.
+- **Domain Modeling & ADR 0002**: Recorded architectural decisions in `docs/adr/0002-dynamic-naming-and-album-routing.md` and expanded `CONTEXT.md`.
+
 ## [0.1.1] - 2026-09-24
+
 
 ### Added
 - **`IngestionPipeline` Deep Module**: Consolidated deduplication, archive handling, EXIF metadata extraction, Immich asset creation, and album grouping behind a single batch interface.
