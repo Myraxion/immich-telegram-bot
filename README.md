@@ -135,13 +135,18 @@ All settings are read from `.env`.
 | `IMMICH_URL` | ✅ | — | Immich base URL ending in `/api`. |
 | `IMMICH_API_KEY` | ✅ | — | API key from Immich account settings. |
 | `ALLOWED_USER_IDS` | ✅ | — | Comma-separated whitelist of Telegram user IDs. |
-| `ALBUM_NAME` |  | `Telegram Inbox` | Album to add every upload to. Empty = library only. |
+| `ALBUM_NAME` |  | `Telegram Inbox` | Default fallback album. Empty = library only. |
+| `TZ` |  | `UTC` | Timezone for filename and album dates (e.g. `Asia/Shanghai`). |
+| `MEDIA_NAME_TEMPLATE` |  | `{source}_{message_id}_{index}` | Dynamic naming template for photos, videos, animations, and audio. |
+| `DOCUMENT_NAME_TEMPLATE` |  | `{original_name}` | Dynamic naming template for document files. |
+| `ALBUM_NAME_TEMPLATE` |  | *(empty)* | Dynamic album template (e.g. `{source}`). Falls back to `ALBUM_NAME`. |
 | `MAX_ARCHIVE_MB` |  | `2000` | Hard limit for incoming archive size (MB). |
 | `MAX_ARCHIVE_FILES` |  | `1000` | Hard limit for files extracted from one archive. |
 | `LOG_LEVEL` |  | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR`. |
 | `DATA_DIR` |  | `/data` | Inside-container path for `state.sqlite`. |
 | `TG_FILES_DIR` |  | `/var/lib/telegram-bot-api` | Inside-container path of the shared local-Bot-API volume. |
 | `TG_API_BASE` |  | `http://telegram-bot-api:8081` | URL of the local Bot API server. |
+
 
 The bottom three rarely need to change — they match the default `docker-compose.yml`.
 
