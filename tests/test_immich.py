@@ -68,7 +68,6 @@ async def test_ping_does_not_fall_back_for_other_errors() -> None:
     assert requested_paths == ["/api/server/ping"]
 
 
-
 @pytest.mark.asyncio
 async def test_upload_asset_passes_custom_filename(tmp_path) -> None:
     from datetime import UTC, datetime
@@ -125,4 +124,3 @@ async def test_get_or_create_album_uses_cache() -> None:
         assert get_calls == 1  # Cache hit on second call
     finally:
         await client.aclose()
-

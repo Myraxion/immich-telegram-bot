@@ -250,8 +250,6 @@ async def run_bot(settings: Settings) -> None:
             for (it, _), final_fn in zip(raw_items, disambiguated, strict=False)
         ]
 
-
-
         summary = await pipeline.ingest(items)
         uploaded = summary.uploaded
         duplicates = summary.duplicates

@@ -235,4 +235,3 @@ class IngestionPipeline:
         status = result.get("status", "created")
         await self._state.cache_sha1(checksum, asset_id)
         return status, asset_id
-

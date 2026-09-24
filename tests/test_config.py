@@ -31,7 +31,6 @@ def test_allowed_user_ids_accepts_csv_and_json(
     assert settings.allowed_user_ids == expected
 
 
-
 def test_default_naming_and_timezone_settings(
     monkeypatch: pytest.MonkeyPatch, required_settings_env: None
 ) -> None:
@@ -63,4 +62,3 @@ def test_invalid_timezone_raises_value_error(
     monkeypatch.setenv("TZ", "Invalid/Timezone_Name")
     with pytest.raises(ValueError, match="Invalid timezone"):
         Settings(_env_file=None)
-

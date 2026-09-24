@@ -142,7 +142,6 @@ def test_disambiguate_filenames_prevents_secondary_collisions() -> None:
     assert "photo_1.jpg" in disambiguated
 
 
-
 def test_extract_metadata_from_aiogram_channel_forward() -> None:
     tz = ZoneInfo("Asia/Shanghai")
     message = MagicMock()
@@ -192,4 +191,3 @@ def test_extract_metadata_from_aiogram_channel_forward() -> None:
     # msg_date should be message date converted to Asia/Shanghai (10:00 UTC -> 18:00 UTC+8)
     assert meta.msg_date is not None
     assert meta.msg_date.hour == 18
-

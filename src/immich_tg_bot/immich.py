@@ -86,7 +86,6 @@ class ImmichClient:
         self._album_cache[name] = album_id
         return album_id
 
-
     async def add_to_album(self, album_id: str, asset_ids: list[str]) -> None:
         if not asset_ids:
             return

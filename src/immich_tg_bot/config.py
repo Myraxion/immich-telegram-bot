@@ -31,7 +31,6 @@ class Settings(BaseSettings):
     max_archive_files: int = 1000
     log_level: str = "INFO"
 
-
     data_dir: Path = Path("/data")
     tg_files_dir: Path = Path("/var/lib/telegram-bot-api")
     tg_api_base: str = "http://telegram-bot-api:8081"
@@ -65,4 +64,3 @@ class Settings(BaseSettings):
         except (ZoneInfoNotFoundError, ValueError) as e:
             raise ValueError(f"Invalid timezone: {v}") from e
         return v
-

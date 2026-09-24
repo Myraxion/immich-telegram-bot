@@ -151,7 +151,6 @@ def resolve_album_name(
     return stem.strip()
 
 
-
 def disambiguate_filenames(filenames: Sequence[str]) -> list[str]:
     counts = Counter(filenames)
     if not any(c > 1 for c in counts.values()):
@@ -211,7 +210,6 @@ def extract_metadata(
     chat_title = (getattr(chat, "title", None) or getattr(chat, "full_name", "")) or ""
     chat_id = str(chat.id) if (chat and getattr(chat, "id", None) is not None) else ""
     chat_username = getattr(chat, "username", "") or "" if chat else ""
-
 
     msg_id = str(message.message_id)
     msg_date = message.date.astimezone(target_tz) if message.date else datetime.now(target_tz)

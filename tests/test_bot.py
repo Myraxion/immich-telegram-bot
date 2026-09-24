@@ -127,4 +127,3 @@ async def test_extract_ingest_item_from_photo_uses_dynamic_naming(tmp_path: Path
     assert item is not None
     assert item.file_name == "MyChat_999_1.jpg"
     assert item.target_album == "MyChat"
-

@@ -389,4 +389,3 @@ async def test_ingest_dynamic_album_routing_groups_assets(
     # Channel_A should have asset-1 and asset-3; Channel_B should have asset-2
     fake_immich.add_to_album.assert_any_await("id-Channel_A", ["asset-1", "asset-3"])
     fake_immich.add_to_album.assert_any_await("id-Channel_B", ["asset-2"])
-
