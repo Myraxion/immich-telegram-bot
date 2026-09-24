@@ -2,10 +2,10 @@
 
 > Self-hosted Telegram bot that uploads photos, videos and archives forwarded to it straight into your [Immich](https://immich.app) library.
 
-[![Release](https://img.shields.io/github/v/release/gigavat/immich-telegram-bot?display_name=tag&sort=semver)](https://github.com/gigavat/immich-telegram-bot/releases)
-[![Docker image](https://img.shields.io/badge/ghcr.io-immich--telegram--bot-blue?logo=docker)](https://github.com/gigavat/immich-telegram-bot/pkgs/container/immich-telegram-bot)
+[![Release](https://img.shields.io/github/v/release/myraxion/immich-telegram-bot?display_name=tag&sort=semver)](https://github.com/myraxion/immich-telegram-bot/releases)
+[![Docker image](https://img.shields.io/badge/ghcr.io-immich--telegram--bot-blue?logo=docker)](https://github.com/myraxion/immich-telegram-bot/pkgs/container/immich-telegram-bot)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-orange.svg)](LICENSE)
-[![CI](https://github.com/gigavat/immich-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/gigavat/immich-telegram-bot/actions/workflows/ci.yml)
+[![CI](https://github.com/myraxion/immich-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/myraxion/immich-telegram-bot/actions/workflows/ci.yml)
 
 Someone shares a photo with you over Telegram and you want it in your photo library? Forward it to this bot — it will upload it for you, deduplicate, and (optionally) put it into a dedicated album.
 
@@ -50,8 +50,8 @@ You need a working Immich instance and Docker installed.
 ```bash
 mkdir immich-telegram-bot && cd immich-telegram-bot
 
-curl -O https://raw.githubusercontent.com/gigavat/immich-telegram-bot/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/gigavat/immich-telegram-bot/main/.env.example
+curl -O https://raw.githubusercontent.com/myraxion/immich-telegram-bot/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/myraxion/immich-telegram-bot/main/.env.example
 
 # Fill in the 6 required values (see "Detailed setup" below)
 ${EDITOR:-nano} .env
@@ -172,7 +172,7 @@ The Immich library is untouched — uploaded assets stay there.
 ## Development
 
 ```bash
-git clone https://github.com/gigavat/immich-telegram-bot.git
+git clone https://github.com/myraxion/immich-telegram-bot.git
 cd immich-telegram-bot
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
@@ -184,7 +184,7 @@ docker compose up
 ```
 
 CI runs `ruff` lint/format and a Docker build smoke-test on every PR.
-Releases are cut by pushing a `vX.Y.Z` tag — that triggers a multi-arch build pushed to `ghcr.io/gigavat/immich-telegram-bot`.
+Releases are cut by pushing a `vX.Y.Z` tag — that triggers a multi-arch build pushed to `ghcr.io/myraxion/immich-telegram-bot`.
 
 ## License
 

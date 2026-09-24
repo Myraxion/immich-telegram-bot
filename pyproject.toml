@@ -5,7 +5,7 @@ description = "Telegram bot that uploads forwarded photos, videos and archives t
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-only" }
-authors = [{ name = "gigavat" }]
+authors = [{ name = "myraxion" }]
 keywords = ["immich", "telegram", "bot", "self-hosted", "photos"]
 classifiers = [
     "Programming Language :: Python :: 3.12",
@@ -32,8 +32,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/gigavat/immich-telegram-bot"
-Issues = "https://github.com/gigavat/immich-telegram-bot/issues"
+Homepage = "https://github.com/myraxion/immich-telegram-bot"
+Issues = "https://github.com/myraxion/immich-telegram-bot/issues"
 
 [project.scripts]
 immich-telegram-bot = "immich_tg_bot.__main__:main"

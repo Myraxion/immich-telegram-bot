@@ -10,7 +10,7 @@ services:
       - tg-files:/var/lib/telegram-bot-api
 
   bot:
-    image: ghcr.io/gigavat/immich-telegram-bot:latest
+    image: ghcr.io/myraxion/immich-telegram-bot:latest
     restart: unless-stopped
     env_file: .env
     depends_on:
