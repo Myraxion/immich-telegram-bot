@@ -71,17 +71,15 @@ def _is_archive_message(message: Message) -> bool:
 
 
 async def _resolve_local_path(bot: Bot, file_id: str, tg_files_dir: Path) -> Path:
-    """In local Bot API mode, file.file_path is an absolute server-side filesystem
-    path. The volume is mounted into our container at the same path, so we read
-    it directly."""
+    """Locate a file exposed by the local Bot API through the shared volume."""
     tg_file = await bot.get_file(file_id)
     if tg_file.file_path is None:
         raise FileNotFoundError("Telegram returned no file_path")
     fp = Path(tg_file.file_path)
     if fp.is_absolute() and fp.exists():
         return fp
-    # Fallback: try resolving relative to the shared mount.
-    candidate = tg_files_dir / fp.name
+    # Relative paths are rooted at the local Bot API's per-bot work directory.
+    candidate = tg_files_dir / bot.token / fp
     if candidate.exists():
         return candidate
     raise FileNotFoundError(f"Cannot locate downloaded file: {tg_file.file_path}")
