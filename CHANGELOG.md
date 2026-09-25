@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-09-25
+
+### Added
+- **Native Telegram Localization**: Automatic multi-language reply matching sender's Telegram client language preference with support for English (`en`), Chinese (`zh`), Japanese (`ja`), and Russian (`ru`).
+- **Configurable Fallback Language**: Added `DEFAULT_LANGUAGE` environment variable (default: `en`, options: `en`, `zh`, `ja`, `ru`) for unconfigured or unsupported sender locales.
+- **Media Group Language Consistency**: Multi-asset media groups consistently resolve localization against the leading message sender preference.
+- **Domain Modeling & ADR 0003**: Recorded architecture decision in `docs/adr/0003-telegram-native-localization.md` and added `LanguagePreference` domain definition to `CONTEXT.md`.
+
 ## [0.1.2] - 2026-09-24
 
 ### Added
