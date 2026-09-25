@@ -183,8 +183,12 @@ The Immich library is untouched — uploaded assets stay there.
 ```bash
 git clone https://github.com/myraxion/immich-telegram-bot.git
 cd immich-telegram-bot
-python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+
+# Using uv (recommended):
+uv sync --all-extras --dev
+
+# Or using standard venv + pip:
+# python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 
 # Build a local image and run with compose:
 docker build -t local/immich-telegram-bot .
@@ -192,7 +196,7 @@ docker build -t local/immich-telegram-bot .
 docker compose up
 ```
 
-CI runs `ruff` lint/format and a Docker build smoke-test on every PR.
+CI runs `ruff` lint/format, `pytest`, and a Docker build smoke-test on every PR.
 Releases are cut by pushing a `vX.Y.Z` tag — that triggers a multi-arch build pushed to `ghcr.io/myraxion/immich-telegram-bot`.
 
 ## License

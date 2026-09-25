@@ -182,8 +182,12 @@ Immich 中的照片库不受任何影响 —— 已上传的资源依然保留�
 ```bash
 git clone https://github.com/myraxion/immich-telegram-bot.git
 cd immich-telegram-bot
-python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+
+# 使用 uv（推荐）：
+uv sync --all-extras --dev
+
+# 或使用标准 venv + pip：
+# python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 
 # 构建本地镜像并使用 Compose 运行：
 docker build -t local/immich-telegram-bot .
@@ -191,7 +195,7 @@ docker build -t local/immich-telegram-bot .
 docker compose up
 ```
 
-每次 PR 时 CI 会自动运行 `ruff` 代码检查/格式化以及 Docker 构建冒烟测试。
+每次 PR 时 CI 会自动运行 `ruff` 代码检查/格式化、`pytest` 单元测试以及 Docker 构建冒烟测试。
 发布新版本时，推送 `vX.Y.Z` 标签将自动触发多架构镜像构建并发布至 `ghcr.io/myraxion/immich-telegram-bot`。
 
 ## 开源协议

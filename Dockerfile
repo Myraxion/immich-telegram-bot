@@ -6,16 +6,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
+# Install dependencies first for better layer caching
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Copy source and install project
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN uv sync --frozen --no-dev
 
 RUN mkdir -p /data
 VOLUME ["/data"]
 
 ENV PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH" \
     DATA_DIR=/data \
     TG_FILES_DIR=/var/lib/telegram-bot-api \
     TG_API_BASE=http://telegram-bot-api:8081
@@ -25,3 +35,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 ENTRYPOINT ["tini", "--"]
 CMD ["python", "-m", "immich_tg_bot"]
+
