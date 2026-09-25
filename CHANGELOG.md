@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-09-25
+
+### Added
+- **Automatic Local File Cleanup**: Ingested files downloaded by the local Telegram Bot API server are automatically deleted upon successful upload to Immich or duplicate detection, preventing disk accumulation in `/var/lib/telegram-bot-api`.
+- **Configurable Cleanup Switch (`CLEANUP_LOCAL_FILES`)**: Added `CLEANUP_LOCAL_FILES` environment variable (default: `true`). Can be set to `false` if users need to retain downloaded local files for debugging.
+- **Fault-Tolerant File Lifecycle**: Ingestion failures (such as archive extraction errors or network issues during upload) retain local files for investigation without deleting them prematurely; filesystem unlinks catch `OSError` to avoid interrupting processing.
+
+### Changed
+- **Compose Mount Mode**: Updated `docker-compose.yml` to mount the shared `tg-files` volume into `immich-telegram-bot` in read-write mode (removed `:ro`) to enable file deletion.
+
 ## [0.1.3] - 2026-09-25
 
 ### Added
