@@ -85,3 +85,14 @@ def test_invalid_language_raises_value_error(
     monkeypatch.setenv("DEFAULT_LANGUAGE", "fr")
     with pytest.raises(ValueError, match="Invalid default_language"):
         Settings(_env_file=None)
+
+
+def test_cleanup_local_files_setting(
+    monkeypatch: pytest.MonkeyPatch, required_settings_env: None
+) -> None:
+    settings = Settings(_env_file=None)
+    assert settings.cleanup_local_files is True
+
+    monkeypatch.setenv("CLEANUP_LOCAL_FILES", "false")
+    settings_custom = Settings(_env_file=None)
+    assert settings_custom.cleanup_local_files is False

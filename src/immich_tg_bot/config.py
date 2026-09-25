@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/data")
     tg_files_dir: Path = Path("/var/lib/telegram-bot-api")
     tg_api_base: str = "http://telegram-bot-api:8081"
+    cleanup_local_files: bool = True
 
     @field_validator("allowed_user_ids", mode="before")
     @classmethod

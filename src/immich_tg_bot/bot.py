@@ -258,6 +258,7 @@ async def run_bot(settings: Settings) -> None:
         album_id=album_id,
         default_album_name=settings.album_name,
         max_archive_files=settings.max_archive_files,
+        cleanup_local=settings.cleanup_local_files,
     )
 
     dp = Dispatcher()

@@ -60,6 +60,13 @@ def _exif_datetime(path: Path) -> datetime | None:
     return None
 
 
+def _safe_unlink(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as e:
+        log.warning("Could not remove local file %s: %s", path, e)
+
+
 class IngestionPipeline:
     def __init__(
         self,
@@ -69,6 +76,7 @@ class IngestionPipeline:
         default_album_name: str | None = None,
         max_archive_files: int = 1000,
         device_id: str = DEVICE_ID,
+        cleanup_local: bool = True,
     ) -> None:
         self._immich = immich
         self._state = state
@@ -76,6 +84,7 @@ class IngestionPipeline:
         self._default_album_name = default_album_name
         self._max_archive_files = max_archive_files
         self._device_id = device_id
+        self._cleanup_local = cleanup_local
 
     async def ingest(self, items: Sequence[IngestItem]) -> IngestSummary:
         summary = IngestSummary()
@@ -105,6 +114,10 @@ class IngestionPipeline:
 
         return summary
 
+    def _maybe_cleanup(self, path: Path) -> None:
+        if self._cleanup_local:
+            _safe_unlink(path)
+
     async def _ingest_item(
         self,
         item: IngestItem,
@@ -114,6 +127,7 @@ class IngestionPipeline:
         # 1. 消息级去重
         if await self._state.already_processed(item.chat_id, item.message_id):
             summary.duplicates += 1
+            self._maybe_cleanup(item.local_path)
             return
 
         # 2. 单文件 vs 归档展开
@@ -139,6 +153,7 @@ class IngestionPipeline:
                 if not media:
                     log.info("Archive %s contained no recognised media", item.local_path)
                     await self._state.mark_processed(item.chat_id, item.message_id, 0, "done", None)
+                    self._maybe_cleanup(item.local_path)
                     return
 
                 for i, m in enumerate(media):
@@ -169,6 +184,7 @@ class IngestionPipeline:
         # 3. 严格成功标记：若无错误，标记消息已完成
         if not item_errors:
             await self._state.mark_processed(item.chat_id, item.message_id, 0, "done", None)
+            self._maybe_cleanup(item.local_path)
 
     async def _dispatch_upload(
         self,

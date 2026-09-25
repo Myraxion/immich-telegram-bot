@@ -21,9 +21,8 @@ services:
     depends_on:
       - telegram-bot-api
     volumes:
-      - tg-files:/var/lib/telegram-bot-api:ro
+      - tg-files:/var/lib/telegram-bot-api
       - ./data:/data
-
 
 volumes:
   tg-files:

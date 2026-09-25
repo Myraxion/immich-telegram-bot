@@ -389,3 +389,142 @@ async def test_ingest_dynamic_album_routing_groups_assets(
     # Channel_A should have asset-1 and asset-3; Channel_B should have asset-2
     fake_immich.add_to_album.assert_any_await("id-Channel_A", ["asset-1", "asset-3"])
     fake_immich.add_to_album.assert_any_await("id-Channel_B", ["asset-2"])
+
+
+@pytest.mark.asyncio
+async def test_ingest_cleans_up_local_file_on_success(
+    tmp_path: Path, state: State, fake_immich: AsyncMock
+) -> None:
+    img_path = tmp_path / "photo.jpg"
+    img_path.write_bytes(b"dummy image data")
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state, cleanup_local=True)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img_path,
+        file_name="photo.jpg",
+        created_at=datetime.now(UTC),
+    )
+
+    summary = await pipeline.ingest([item])
+    assert summary.uploaded == 1
+    assert not img_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_ingest_cleans_up_local_file_on_duplicate(
+    tmp_path: Path, state: State, fake_immich: AsyncMock
+) -> None:
+    img_path = tmp_path / "photo.jpg"
+    img_path.write_bytes(b"dummy image data")
+
+    await state.mark_processed(1001, 2001, 0, "done", None)
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state, cleanup_local=True)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img_path,
+        file_name="photo.jpg",
+        created_at=datetime.now(UTC),
+    )
+
+    summary = await pipeline.ingest([item])
+    assert summary.duplicates == 1
+    assert not img_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_ingest_retains_local_file_on_failure(
+    tmp_path: Path, state: State, fake_immich: AsyncMock
+) -> None:
+    img_path = tmp_path / "photo.jpg"
+    img_path.write_bytes(b"dummy image data")
+
+    fake_immich.upload_asset.side_effect = RuntimeError("network error")
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state, cleanup_local=True)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img_path,
+        file_name="photo.jpg",
+        created_at=datetime.now(UTC),
+    )
+
+    summary = await pipeline.ingest([item])
+    assert summary.errors == 1
+    assert img_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_ingest_retains_local_file_when_cleanup_disabled(
+    tmp_path: Path, state: State, fake_immich: AsyncMock
+) -> None:
+    img_path = tmp_path / "photo.jpg"
+    img_path.write_bytes(b"dummy image data")
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state, cleanup_local=False)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img_path,
+        file_name="photo.jpg",
+        created_at=datetime.now(UTC),
+    )
+
+    summary = await pipeline.ingest([item])
+    assert summary.uploaded == 1
+    assert img_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_ingest_archive_cleans_up_archive_file_on_success(
+    tmp_path: Path, state: State, fake_immich: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive_path = tmp_path / "bundle.zip"
+    archive_path.write_bytes(b"dummy zip data")
+
+    async def fake_extract(archive: Path, dest: Path) -> None:
+        (dest / "photo.jpg").write_bytes(b"jpeg bytes")
+
+    monkeypatch.setattr("immich_tg_bot.pipeline.extract", fake_extract)
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state, cleanup_local=True)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=archive_path,
+        file_name="bundle.zip",
+        created_at=datetime.now(UTC),
+    )
+
+    summary = await pipeline.ingest([item])
+    assert summary.uploaded == 1
+    assert not archive_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_ingest_cleanup_handles_os_error_gracefully(
+    tmp_path: Path, state: State, fake_immich: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    img_path = tmp_path / "photo.jpg"
+    img_path.write_bytes(b"dummy image data")
+
+    def mock_unlink(self: Path, missing_ok: bool = False) -> None:
+        raise OSError("Permission denied")
+
+    monkeypatch.setattr(Path, "unlink", mock_unlink)
+
+    pipeline = IngestionPipeline(immich=fake_immich, state=state, cleanup_local=True)
+    item = IngestItem(
+        chat_id=1001,
+        message_id=2001,
+        local_path=img_path,
+        file_name="photo.jpg",
+        created_at=datetime.now(UTC),
+    )
+
+    summary = await pipeline.ingest([item])
+    assert summary.uploaded == 1
