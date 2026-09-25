@@ -96,7 +96,7 @@ The bundled local Bot API server needs Telegram application credentials to authe
 If you run the bot in a separate Compose project, also attach it to Immich's network:
 
 ```yaml
-# add to docker-compose.yml under bot:
+# add to docker-compose.yml under immich-telegram-bot:
 networks: [immich, default]
 networks:
   immich:
@@ -114,7 +114,7 @@ Multiple users? Comma-separated: `ALLOWED_USER_IDS=11111111,22222222`.
 
 ```bash
 docker compose up -d
-docker compose logs -f bot
+docker compose logs -f immich-telegram-bot
 ```
 
 On a clean start you should see something like:
@@ -160,7 +160,7 @@ The bottom three rarely need to change — they match the default `docker-compos
 - **Photos sent as Picture lose EXIF and are recompressed by Telegram.** The bot still uploads them, but timestamps will use the message date and not the original capture date. Send as **Document/File** to preserve everything.
 - **First start of `telegram-bot-api` initialises a per-bot directory** and takes ~10–30 seconds. The bot may log a few connection retries during that window; it will settle.
 - **`tg-files` named volume can grow** since the local Bot API server keeps each downloaded file until you call `deleteFile`. The bot does not currently delete them; safe to `docker compose down -v` periodically if you don't need history.
-- **Compose network**: by default the `bot` service can reach `telegram-bot-api` (same Compose project network) but **not your Immich instance** unless they share a network. See step 4 above.
+- **Compose network**: by default the `immich-telegram-bot` service can reach `telegram-bot-api` (same Compose project network) but **not your Immich instance** unless they share a network. See step 4 above.
 
 ## Updating
 
