@@ -15,9 +15,10 @@ from aiogram.filters import Command
 from aiogram.types import Message, TelegramObject
 
 from .config import Settings
+from .i18n import resolve_language, t
 from .immich import ImmichClient
 from .naming import disambiguate_filenames, extract_metadata, resolve_album_name, resolve_filename
-from .pipeline import IngestionPipeline, IngestItem, _exif_datetime
+from .pipeline import IngestionPipeline, IngestItem, IngestSummary, _exif_datetime
 from .state import State
 
 log = logging.getLogger(__name__)
@@ -46,6 +47,10 @@ class WhitelistMiddleware(BaseMiddleware):
             )
             return None
         return await handler(event, data)
+
+
+def _sender_language_code(message: Message) -> str | None:
+    return message.from_user.language_code if message.from_user else None
 
 
 def _media_info_for(message: Message) -> tuple[str | None, str, str, str]:
@@ -177,6 +182,49 @@ async def _extract_ingest_item(
     )
 
 
+def format_summary_reply(
+    summary: IngestSummary,
+    resolve_errors: int = 0,
+    lang_code: str | None = None,
+    default_lang: str = "en",
+) -> str:
+    target_lang = resolve_language(lang_code, default_lang=default_lang)
+    uploaded = summary.uploaded
+    duplicates = summary.duplicates
+    errors = summary.errors + resolve_errors
+
+    if errors and not uploaded and not duplicates:
+        return t("status_errors_only", lang_code=target_lang, errors=errors)
+    if errors:
+        return t(
+            "status_mixed",
+            lang_code=target_lang,
+            uploaded=uploaded,
+            duplicates=duplicates,
+            errors=errors,
+        )
+    if duplicates and not uploaded:
+        return t(
+            "status_duplicates_only",
+            lang_code=target_lang,
+            duplicates=duplicates,
+        )
+    if duplicates:
+        return t(
+            "status_uploaded_duplicates",
+            lang_code=target_lang,
+            uploaded=uploaded,
+            duplicates=duplicates,
+        )
+    if uploaded:
+        return t(
+            "status_uploaded_only",
+            lang_code=target_lang,
+            uploaded=uploaded,
+        )
+    return t("status_no_media", lang_code=target_lang)
+
+
 async def run_bot(settings: Settings) -> None:
     session = AiohttpSession(
         api=TelegramAPIServer.from_base(settings.tg_api_base, is_local=True),
@@ -220,6 +268,8 @@ async def run_bot(settings: Settings) -> None:
     group_lock = asyncio.Lock()
 
     async def _process_messages(messages: list[Message]) -> None:
+        head = messages[0]
+        head_lang = _sender_language_code(head)
         raw_items: list[tuple[IngestItem, str]] = []
         resolve_errors = 0
         for idx, m in enumerate(messages, start=1):
@@ -232,7 +282,13 @@ async def run_bot(settings: Settings) -> None:
             except Exception as e:
                 log.exception("Could not get file for message %s", m.message_id)
                 with suppress(Exception):
-                    await m.reply(f"⚠️ Не удалось получить файл: {e}")
+                    err_msg = t(
+                        "error_file_fetch",
+                        lang_code=head_lang,
+                        default_lang=settings.default_language,
+                        error=e,
+                    )
+                    await m.reply(err_msg)
                 resolve_errors += 1
 
         filenames = [fn for _, fn in raw_items]
@@ -251,23 +307,13 @@ async def run_bot(settings: Settings) -> None:
         ]
 
         summary = await pipeline.ingest(items)
-        uploaded = summary.uploaded
-        duplicates = summary.duplicates
-        errors = summary.errors + resolve_errors
-
-        head = messages[0]
-        if errors and not uploaded and not duplicates:
-            await head.reply(f"⚠️ Ошибок: {errors}")
-        elif errors:
-            await head.reply(f"⚠️ Загружено: {uploaded}, дубликатов: {duplicates}, ошибок: {errors}")
-        elif duplicates and not uploaded:
-            await head.reply(f"♻️ Уже в Immich (дубликатов: {duplicates})")
-        elif duplicates:
-            await head.reply(f"✅ Загружено: {uploaded}, дубликатов: {duplicates}")
-        elif uploaded:
-            await head.reply(f"✅ Загружено: {uploaded}")
-        else:
-            await head.reply("ℹ️ В этом сообщении не нашлось медиа для загрузки.")
+        reply_text = format_summary_reply(
+            summary,
+            resolve_errors=resolve_errors,
+            lang_code=head_lang,
+            default_lang=settings.default_language,
+        )
+        await head.reply(reply_text)
 
     async def _flush_group(mg_id: str) -> None:
         try:
@@ -283,22 +329,16 @@ async def run_bot(settings: Settings) -> None:
 
     @dp.message(Command("start"))
     async def cmd_start(message: Message) -> None:
+        sender_lang = _sender_language_code(message)
         await message.reply(
-            "👋 Привет! Пересылай мне фото, видео, файлы и архивы — "
-            "и я залью их в твой Immich.\n\n"
-            "Фото лучше отправлять <b>как файл / Document</b>, чтобы сохранить "
-            "EXIF и оригинальное качество."
+            t("start", lang_code=sender_lang, default_lang=settings.default_language)
         )
 
     @dp.message(Command("help"))
     async def cmd_help(message: Message) -> None:
+        sender_lang = _sender_language_code(message)
         await message.reply(
-            "Что я умею:\n"
-            "• photo / video / animation / voice / audio / video_note\n"
-            "• document (фото, видео, любой файл)\n"
-            "• архивы zip / rar / 7z / tar — распаковываю и заливаю медиа\n"
-            "• media group (альбомы до 10 файлов) — обрабатываю вместе\n\n"
-            "Дубликаты определяются по SHA1 — повторная отправка безопасна."
+            t("help", lang_code=sender_lang, default_lang=settings.default_language)
         )
 
     media_filter = F.photo | F.video | F.document | F.animation | F.audio | F.voice | F.video_note

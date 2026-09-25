@@ -36,4 +36,8 @@ _Avoid_: TelegramContext, OriginInfo, MessageData
 The dynamic resolution of target Immich albums evaluated per ingestion item, with batch grouping and static fallback.
 _Avoid_: AlbumMapping, FolderDispatch
 
+### Localization
 
+**LanguagePreference**:
+The resolved target language tag ('en', 'zh', 'ja', 'ru') derived from Telegram message sender metadata and default configuration, used to select localized reply messages.
+_Avoid_: UserLanguage, LocaleSetting, MessageLanguage

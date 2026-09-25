@@ -5,6 +5,8 @@ from typing import Annotated
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from .i18n import SUPPORTED_LANGUAGES
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -26,6 +28,7 @@ class Settings(BaseSettings):
     media_name_template: str = "{source}_{message_id}_{index}"
     document_name_template: str = "{original_name}"
     tz: str = "UTC"
+    default_language: str = "en"
 
     max_archive_mb: int = 2000
     max_archive_files: int = 1000
@@ -64,3 +67,12 @@ class Settings(BaseSettings):
         except (ZoneInfoNotFoundError, ValueError) as e:
             raise ValueError(f"Invalid timezone: {v}") from e
         return v
+
+    @field_validator("default_language")
+    @classmethod
+    def _validate_default_language(cls, v: str) -> str:
+        lang = v.strip().lower()
+        if lang not in SUPPORTED_LANGUAGES:
+            supported_str = ", ".join(SUPPORTED_LANGUAGES)
+            raise ValueError(f"Invalid default_language: {v!r}. Must be one of: {supported_str}")
+        return lang

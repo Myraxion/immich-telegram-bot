@@ -127,3 +127,44 @@ async def test_extract_ingest_item_from_photo_uses_dynamic_naming(tmp_path: Path
     assert item is not None
     assert item.file_name == "MyChat_999_1.jpg"
     assert item.target_album == "MyChat"
+
+
+def test_format_summary_reply_languages() -> None:
+    from immich_tg_bot.bot import format_summary_reply
+    from immich_tg_bot.pipeline import IngestSummary
+
+    # 1. uploaded only
+    s1 = IngestSummary(uploaded=3, duplicates=0, errors=0)
+    assert "已上传：3" in format_summary_reply(s1, lang_code="zh-Hans")
+    assert "Uploaded: 3" in format_summary_reply(s1, lang_code="en")
+    assert "アップロード済み: 3" in format_summary_reply(s1, lang_code="ja")
+    assert "Загружено: 3" in format_summary_reply(s1, lang_code="ru")
+
+    # 2. duplicates only
+    s2 = IngestSummary(uploaded=0, duplicates=2, errors=0)
+    assert "已存在于 Immich（重复项：2）" in format_summary_reply(s2, lang_code="zh")
+    assert "Already in Immich (duplicates: 2)" in format_summary_reply(s2, lang_code="en")
+
+    # 3. uploaded and duplicates
+    s3 = IngestSummary(uploaded=2, duplicates=1, errors=0)
+    assert "已上传：2，重复项：1" in format_summary_reply(s3, lang_code="zh")
+    assert "Uploaded: 2, duplicates: 1" in format_summary_reply(s3, lang_code="en")
+
+    # 4. errors only
+    s4 = IngestSummary(uploaded=0, duplicates=0, errors=2)
+    assert "失败：2" in format_summary_reply(s4, lang_code="zh")
+    assert "Errors: 2" in format_summary_reply(s4, lang_code="en")
+
+    # 5. mixed
+    s5 = IngestSummary(uploaded=1, duplicates=1, errors=1)
+    assert "已上传：1，重复项：1，失败：1" in format_summary_reply(s5, lang_code="zh")
+    assert "Uploaded: 1, duplicates: 1, errors: 1" in format_summary_reply(s5, lang_code="en")
+
+    # 6. no media
+    s6 = IngestSummary(uploaded=0, duplicates=0, errors=0)
+    assert "未找到可供上传的媒体文件" in format_summary_reply(s6, lang_code="zh")
+    assert "No media found in this message to upload" in format_summary_reply(s6, lang_code="en")
+
+    # 7. fallback when unsupported or None
+    assert "Uploaded: 3" in format_summary_reply(s1, lang_code="fr", default_lang="en")
+    assert "Загружено: 3" in format_summary_reply(s1, lang_code=None, default_lang="ru")

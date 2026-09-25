@@ -62,3 +62,26 @@ def test_invalid_timezone_raises_value_error(
     monkeypatch.setenv("TZ", "Invalid/Timezone_Name")
     with pytest.raises(ValueError, match="Invalid timezone"):
         Settings(_env_file=None)
+
+
+def test_default_language_setting(
+    monkeypatch: pytest.MonkeyPatch, required_settings_env: None
+) -> None:
+    settings = Settings(_env_file=None)
+    assert settings.default_language == "en"
+
+
+def test_custom_language_setting(
+    monkeypatch: pytest.MonkeyPatch, required_settings_env: None
+) -> None:
+    monkeypatch.setenv("DEFAULT_LANGUAGE", "ZH")
+    settings = Settings(_env_file=None)
+    assert settings.default_language == "zh"
+
+
+def test_invalid_language_raises_value_error(
+    monkeypatch: pytest.MonkeyPatch, required_settings_env: None
+) -> None:
+    monkeypatch.setenv("DEFAULT_LANGUAGE", "fr")
+    with pytest.raises(ValueError, match="Invalid default_language"):
+        Settings(_env_file=None)

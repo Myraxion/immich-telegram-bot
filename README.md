@@ -17,6 +17,7 @@ Someone shares a photo with you over Telegram and you want it in your photo libr
 - 🔁 **Deduplication** via SHA-1: forwarding the same file twice is safe and free.
 - 📅 **EXIF-aware timestamps**: original capture date is preserved when present (otherwise falls back to the Telegram message date).
 - 🔒 **Whitelist auth**: only allowed Telegram user IDs can talk to the bot.
+- 🌐 **Multi-language support**: automatic replies matching sender's Telegram language (English, Chinese, Japanese, Russian) with configurable fallback.
 - 📂 **Optional album**: every uploaded asset goes into the album you name.
 - 🚀 **Large files up to 2 GB** via a bundled [local Bot API server](https://github.com/tdlib/telegram-bot-api) — the stock cloud API caps downloads at 20 MB.
 - 🐳 **Two-container Compose stack**, multi-arch image (`linux/amd64`, `linux/arm64`).
@@ -137,6 +138,7 @@ All settings are read from `.env`.
 | `ALLOWED_USER_IDS` | ✅ | — | Comma-separated whitelist of Telegram user IDs. |
 | `ALBUM_NAME` |  | `Telegram Inbox` | Default fallback album. Empty = library only. |
 | `TZ` |  | `UTC` | Timezone for filename and album dates (e.g. `Asia/Shanghai`). |
+| `DEFAULT_LANGUAGE` |  | `en` | Default fallback reply language (`en`, `zh`, `ja`, `ru`). |
 | `MEDIA_NAME_TEMPLATE` |  | `{source}_{message_id}_{index}` | Dynamic naming template for photos, videos, animations, and audio. |
 | `DOCUMENT_NAME_TEMPLATE` |  | `{original_name}` | Dynamic naming template for document files. |
 | `ALBUM_NAME_TEMPLATE` |  | *(empty)* | Dynamic album template (e.g. `{source}`). Falls back to `ALBUM_NAME`. |
